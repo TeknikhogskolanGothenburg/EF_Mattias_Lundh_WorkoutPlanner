@@ -1,0 +1,136 @@
+﻿<h3>Draw A Track</h3>
+<br />
+<div id="map"></div>
+
+<div id="mapControls">
+
+    <button onclick="Undo()">Undo Marker</button>
+    <br />
+    <br />
+    @using (Html.BeginForm("SaveTrack", "Home", FormMethod.Post))
+    {
+        <fieldset>
+            <legend>New Track</legend>
+            <div id="routeInfo">
+                @Html.Label("0", new { id = "meters" }) Kilometers
+            </div>
+            <label>Track Name</label>
+            @Html.TextBox("name")
+            <br />
+            <span id="hidden_locationValues"></span>
+            <span id="hidden_distanceValues"></span>
+            @Html.Label("","Comment on track")
+            @Html.TextArea("Text")
+            <br />
+            <input type="submit" value="Save Track">
+        </fieldset>
+    }
+</div>
+
+<script>
+    var markers = [];
+    var map;
+    var directionsDisplay;
+    var directionsService;
+    var routeDistance;
+    function initMap() {
+
+        directionsDisplay = new google.maps.DirectionsRenderer;
+        directionsService = new google.maps.DirectionsService;
+        var mapViewLocation = { lat: 57.7089, lng: 11.9746 }; //Göteborg
+        map = new google.maps.Map(document.getElementById('map'), {
+            zoom: 10,
+            center: mapViewLocation
+        });
+
+        directionsDisplay.setMap(map);
+        map.addListener('click', function (e) {
+            CreateMarker(e.latLng);
+        });
+    }
+
+    function CreateMarker(latLng) {
+        markers.push(new google.maps.Marker({
+            position: latLng,
+            map: map
+        }));
+        if (markers.length > 1) {
+            CalculateRoute();
+            AttachLocationsToForm();
+        }
+    }
+
+    function CalculateRoute() {
+        var allWaypoints = [];
+        for (var i = 1; i <= markers.length - 2; i++) {
+            allWaypoints.push({ location: markers[i].position });
+        }
+
+        var request = {
+            origin: markers[0].position,
+            destination: markers[markers.length - 1].position,
+            waypoints: allWaypoints,
+            travelMode: 'WALKING'
+        };
+
+        directionsService.route(request, function (result, status) {
+            if (status = "OK") {
+                directionsDisplay.setDirections(result);
+                routeDistance = 0;
+                result.routes[0].legs.forEach(l => routeDistance += l.distance.value);
+                DisplayDistance(routeDistance);
+                AttachDistanceToForm(routeDistance);
+            }
+        });
+    }
+
+    function DisplayDistance(value) {
+        document.getElementById('meters').textContent = value / 1000;
+    }
+
+    function Undo() {
+        markers.pop().setMap();
+        CalculateRoute();
+    }
+
+    function AttachDistanceToForm(distanceValue) {
+        var hiddenNode = document.getElementById('hidden_distanceValues');
+        while (hiddenNode.firstChild) {
+            hiddenNode.removeChild(hiddenNode.firstChild);
+        }
+
+        var meters = document.createElement("INPUT");
+        meters.setAttribute("type", "hidden");
+        meters.setAttribute("name", "Meters");
+        meters.setAttribute("value", distanceValue);
+
+        document.getElementById('hidden_distanceValues').appendChild(meters);
+    }
+
+    function AttachLocationsToForm() {
+
+        var hiddenNode = document.getElementById('hidden_locationValues');
+        while (hiddenNode.firstChild) {
+            hiddenNode.removeChild(hiddenNode.firstChild);
+        }
+
+        for (var i = 0; i < markers.length; i++) {
+            var longitudeElementName = '[' + i + '].longitude';
+            var longitude = document.createElement("INPUT");
+            longitude.setAttribute("type", "hidden");
+            longitude.setAttribute("name", longitudeElementName);
+            longitude.setAttribute("value", markers[i].getPosition().lat());
+            var latitudeElementName = '[' + i + '].latitude';
+            var latitude = document.createElement("INPUT");
+            latitude.setAttribute("type", "hidden");
+            latitude.setAttribute("name", latitudeElementName);
+            latitude.setAttribute("value", markers[i].getPosition().lng());
+
+            document.getElementById('hidden_locationValues').appendChild(longitude);
+            document.getElementById('hidden_locationValues').appendChild(latitude);
+        }
+    }
+</script>
+
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBxAKqjyu48QPczRxf_XznZ82hLGukWZH0&callback=initMap"
+        type="text/javascript"></script>
